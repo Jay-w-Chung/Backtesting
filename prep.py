@@ -26,25 +26,28 @@ class LoadData:
             prices_df = self.update_master_file(path, p_name, new_df)
         return prices_df
 
-    def make_historical_price_df(self, path, s_cd):
+    def make_historical_price_df(self, path, s_cd): # build a unified historical DataFrame (universe_df)
         cds = fs.str_list(s_cd)
         all_dates = pd.DatetimeIndex([])
+        # collect all unique dates across symbols
         for c in cds:
             prices_df = self.read_investing_price(path, c)
             prices_df = self.date_formatting(prices_df)
             all_dates = all_dates.union(prices_df.index)
         universe_df = pd.DataFrame(index=all_dates.sort_values())
         universe_df.index.name = 'Date'
+        # add each symbol's prices into the universe DataFrame
         for c in cds:
             prices_df = self.read_investing_price(path, c)
             prices_df = self.date_formatting(prices_df)
             prices_df = self.price_df_trimming(prices_df, c)
             universe_df[c] = prices_df[c]
 
+        # sort and forward fill missing values
         universe_df = universe_df.sort_index().ffill()
         return universe_df
 
-    def create_master_file(self, path, f_name, df):
+    def create_master_file(self, path, f_name, df): # save a new master portfolio CSV if it does not exist
         file_name = self._master_path(path, f_name)
         try:
             with open(file_name): 
@@ -56,13 +59,13 @@ class LoadData:
             df.to_csv(file_name)
         return df
 
-    def read_master_file(self, path, n):
+    def read_master_file(self, path, n): # read an existing master portfolio CSV
         file_name = self._master_path(path, n)
         prices_df = pd.read_csv(file_name, index_col='Date', parse_dates=True)
         prices_df.sort_index(axis=0, inplace=True)
         return prices_df
 
-    def get_codes(self, prices_df):
+    def get_codes(self, prices_df): # return to the list of colunn names (symbols) in the DataFrame
         return prices_df.columns.values
 
     def read_raw_csv(self, path, n):
@@ -84,12 +87,12 @@ class LoadData:
         df.index.name = 'Date'
         return df
 
-    def price_formatting(self, df, c='Price'): 
-        s = df[c].astype(str).str.replace(',', '', regex=False)
+    def price_formatting(self, df, c='Price'): # convert price columns to numeric
+        s = df[c].astype(str).str.replace(',', '', regex=False) # remove commas
         df[c] = pd.to_numeric(s, errors='coerce')
         return df
 
-    def price_df_trimming(self, df, cd):
+    def price_df_trimming(self, df, cd): # extract and clean a single column of prices
         df = self.price_formatting(df, 'Price')
         df_new = pd.DataFrame({cd: df['Price']})
         df_new.sort_index(inplace=True)
